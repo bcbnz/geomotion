@@ -1,0 +1,6 @@
+Prerequisites:
+--------------
+
+* Python.
+* The pytz timezone library.
+* SQLite 3.6.19 or later.
