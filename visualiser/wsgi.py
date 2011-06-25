@@ -14,8 +14,12 @@
 # You should have received a copy of the GNU General Public License along with
 # geomotion.  If not, see <http://www.gnu.org/licenses/>.
 
+import json
+import os
 import os.path
 import wsgiref.util
+
+import sm
 
 # The status code definitions specified in RFC2616.
 # See http://www.w3.org/Protocols/rfc2616/rfc2616-sec10.html
@@ -69,9 +73,12 @@ class Application(object):
 
     """
 
-    def __init__(self, media_path=None):
+    def __init__(self, cache_path, media_path=None):
         """
 
+        :param cache_path: The path to the strong motion data cache to retrieve
+                           data from.
+        :type cache_path: string
         :param media_path: The path to serve static media from. If this is set
                            to ``None``, the media/ directory under the directory
                            containing this module will be used.
@@ -79,13 +86,19 @@ class Application(object):
 
         """
         # The directory containing this module.
-        self.path = os.path.abspath(os.path.dirname(os.path.realpath(__file__)))
+        self.path = os.path.normpath(os.path.dirname(os.path.realpath(__file__)))
 
-        # Calculate or store the media path.
+        # Store the path to the cache.
+        self.cache_path = os.path.normpath(os.path.abspath(cache_path))
+
+        # Calculate and store the media path.
         if media_path is None:
             self.media_path = os.path.join(self.path, 'media')
         else:
-            self.media_path = os.path.abspath(media_path)
+            self.media_path = os.path.normpath(os.path.abspath(media_path))
+
+        # Start an instance of the server.
+        self.server = sm.Server(cache_dir=self.cache_path)
 
     def __call__(self, environment, start_response):
         """Handle a WSGI request. This is the entry point for the WSGI
@@ -107,12 +120,73 @@ class Application(object):
         # Get the path and query string.
         path = environment['PATH_INFO']
 
+        # Strong motion events.
+        if path.startswith('/events'):
+            return self.serve_events(path[8:], start_response)
+
         # Static media files.
         if path.startswith('/media/'):
             return self.serve_media(path[7:], start_response)
 
         # No idea what they were after.
         start_response(STATUS_CODE[404], [])
+        return ('File not found',)
+
+    def serve_events(self, path, start_response):
+        """Serve event information encoded as JSON (and with the corresponding
+        application/json content type). This uses the following path formats:
+
+            * No path - return a list of years data exists for.
+            * /<year> - return a list of months within the year that data exists
+                        for.
+            * /<year>/<month> - return a list of events for that year and month.
+                                Each event consists of a pair of values, the
+                                first being an event ID and the second the date
+                                and time it occurred on.
+
+        If an invalid path is used, a 404 error is raised.
+
+        :param path: The path detailing the requested information.
+        :type path: string
+        :param start_response: The WSGI function to start a response.
+        :type start_response: function
+
+        """
+        # The headers to use.
+        headers = [('Content-type', 'application/json')]
+
+        # Split the path up into chunks.
+        chunks = [c for c in path.split('/') if c]
+
+        # No chunks: return a list of event years.
+        if len(chunks) == 0:
+            start_response(STATUS_CODE[200], headers)
+            return json.dumps(self.server.get_years())
+
+        # One chunk - a year to return a list of months for.
+        elif len(chunks) == 1:
+            try:
+                year = int(chunks[0])
+            except ValueError:
+                start_response(STATUS_CODE[404], headers)
+                return ('File not found',)
+            start_response(STATUS_CODE[200], headers)
+            return json.dumps(self.server.get_months(year))
+
+        # Two chunks - a year and month to return event dates for.
+        elif len(chunks) == 2:
+            try:
+                year, month = map(int, chunks)
+            except ValueError:
+                start_response(STATUS_CODE[404], headers)
+                return ('File not found',)
+            start_response(STATUS_CODE[200], headers)
+            events = self.server.get_events(year, month)
+            events = [(event[0], event[1].ctime()) for event in events]
+            return json.dumps(events)
+
+        # Invalid number of arguments.
+        start_response(STATUS_CODE[404], headers)
         return ('File not found',)
 
     def serve_media(self, path, start_response):

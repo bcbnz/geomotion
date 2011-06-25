@@ -16,10 +16,18 @@
 # You should have received a copy of the GNU General Public License along with
 # geomotion.  If not, see <http://www.gnu.org/licenses/>.
 
+import os.path
 from wsgiref.simple_server import make_server
+
+import sys
+sys.path.append(os.path.join(os.path.dirname(os.path.realpath(__file__)), '../'))
+
 from wsgi import Application
 
-server = make_server('localhost', 8080, Application())
+cache_path = os.path.join(os.path.dirname(os.path.realpath(__file__)),
+                          '../cache')
+
+server = make_server('localhost', 8080, Application(cache_path))
 print 'Starting server, use <Ctrl-C> to stop it.'
 print 'Open http://localhost:8080/ in your browser to access it.'
 try:
