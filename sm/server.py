@@ -18,6 +18,7 @@ from datetime import datetime
 import ftplib
 import os
 import os.path
+from operator import itemgetter
 import pytz
 import sqlite3
 import urllib2
@@ -426,7 +427,7 @@ class Server(object):
         events = [(row['id'], self._dbtolocal(year, month, row['day'], row['hour'],
                    row['minute'], row['second'])) for row in cursor]
         cursor.close()
-        return events
+        return sorted(events, key=itemgetter(1))
 
     def _dbtolocal(self, y, m, d, h, mn, s):
         """Helper function to format event dates into a local datetime object.
