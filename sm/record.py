@@ -14,6 +14,7 @@
 # geomotion.  If not, see <http://www.gnu.org/licenses/>.
 
 from datetime import datetime
+import math
 import numpy
 import pytz
 
@@ -159,13 +160,51 @@ def component_iterator(source, timezone):
         except EOFError as e:
             break
 
+class TooFewComponents(ValueError):
+    """Exception raised by the :class:`Record` constructor when the data file
+    given to it does not have enough components to describe a three-dimensional
+    vector. It inherits from the standard Python :class:`ValueError`.
+
+    """
+    pass
 
 class Record(object):
-    """Stores the record of a strong motion event at a particular site. In
-    general, you won't want to create an instance directly. Instead, use the
-    get_record() method of the sm.Server class. This will take care of
-    downloading the appropriate data file from the GeoNet server, and will
-    maintain a local cache of these files.
+    """The record of a strong motion event at a particular site. This reads and
+    processes the data from a GeoNet file.
+
+    In general, a site will make measurements in three directions, two
+    horizontal and one vertical. The two horizontal measurements are commonly
+    made in orthogonal directions. As the headings of these measurements will
+    differ from site to site, this class realigns them so that one is in a
+    northerly direction (a heading of zero degrees) and the other is in an
+    easterly direction (a heading of ninety degrees).
+
+    The instance will have the following attributes:
+
+        * ``acceleration`` - the acceleration data, given in m/s/s as a
+                             numpy array with three rows. The first row is the
+                             horizontal acceleration in a northerly direction
+                             heading of zero degrees), the second row the
+                             horizontal acceleration in an easterly direction
+                             and the final row the vertical acceleration.
+        * ``duration`` - the duration of the record in seconds.
+        * ``event`` - a dictionary containing some details of the event itself,
+                      such as the bearing and distance from the site, the depth,
+                      the location and when the event started.
+        * ``magnitudes`` - a dictionary containing magnitude information about
+                           the event. Note that one or more values may be
+                           missing or set to zero for any given record.
+        * ``site`` - a dictionary containing some information about the site,
+                     such as its location, when it opened, and the local
+                     gravity.
+        * ``start`` - when the recording started. This is commonly a few seconds
+                      prior to the start of the event.
+        * ``timestep`` - the time interval between one data point and the next.
+
+    In general, you do not want to create an instance of this class yourself.
+    Instead, you should use the :func:`get_record` method of the
+    :class:sm.Server: class. This will download the data files from the GeoNet
+    server when necessary, and will maintain a local cache of these files.
 
     """
 
@@ -174,10 +213,13 @@ class Record(object):
 
         :param site_info: The site information dictionary as returned by
                           sm.Server.get_site_info().
+        :type site_info: dictionary
         :param source: The source file to read the data from. This can be either
                        a file object, or a filename.
         :param timezone: The timezone to convert all dates and times to.
         :type timezone: pytz.timezone
+        :raise TooFewComponents: If there are not enough components in the
+                                 source to realign the measurements.
 
         """
         # Given a filename, open it.
@@ -189,12 +231,11 @@ class Record(object):
         # Use the given site info as a base.
         self.site = site_info
 
-        # Start the lists of data.
-        self.components = []
-        self.acceleration = []
-
         # Pull out the components.
         first_run = True
+        seen_axes = set()
+        horizontal_axes = 0
+        vertical_axis = False
         for header, data in component_iterator(source, timezone):
             # Use the first header to populate record information.
             if first_run:
@@ -204,17 +245,36 @@ class Record(object):
                 self.start = header['buffer_start']
                 self.timestep = header['timestep']
                 self.duration = header['duration']
+                self.acceleration = numpy.zeros(shape=(3, len(data['acceleration'])), dtype=float)
                 first_run = False
 
-            # Store which component this is.
-            if header['axis'] == 999:
-                self.components.append('vertical')
-            else:
-                self.components.append(header['axis'])
+            # Sanity check: throw away components with repeated axes.
+            if header['axis'] in seen_axes:
+                continue
+            seen_axes.add(header['axis'])
 
-            # Store the data.
-            self.acceleration.append(data['acceleration'])
+            # The vertical axis is represented by an angle of 999 degrees.
+            if header['axis'] == 999:
+                self.acceleration[2] = data['acceleration']
+                vertical_axis = True
+
+            # Only need two different horizontal axes to be able to realign to N
+            # and E components.
+            elif horizontal_axes < 2:
+                angle = math.radians(header['axis'])
+                self.acceleration[0] += data['acceleration'] * math.cos(angle)
+                self.acceleration[1] += data['acceleration'] * math.sin(angle)
+                horizontal_axes += 1
+
+            # Shortcut: once we have realigned the horizontal components and
+            # have a vertical axis, stop processing the file.
+            if vertical_axis and horizontal_axes == 2:
+                break
 
         # If we opened a file we ought to close it.
         if close:
             source.close()
+
+        # Did we get enough components?
+        if not vertical_axis or horizontal_axes < 2:
+            raise TooFewComponents()
