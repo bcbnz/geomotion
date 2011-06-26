@@ -187,6 +187,7 @@ class Record(object):
                              heading of zero degrees), the second row the
                              horizontal acceleration in an easterly direction
                              and the final row the vertical acceleration.
+        * ``data_length`` - the length of each row of data.
         * ``duration`` - the duration of the record in seconds.
         * ``event`` - a dictionary containing some details of the event itself,
                       such as the bearing and distance from the site, the depth,
@@ -199,6 +200,8 @@ class Record(object):
                      gravity.
         * ``start`` - when the recording started. This is commonly a few seconds
                       prior to the start of the event.
+        * ``time`` - a numpy array containing the times at which the data points
+                     were recorded.
         * ``timestep`` - the time interval between one data point and the next.
 
     In general, you do not want to create an instance of this class yourself.
@@ -245,7 +248,9 @@ class Record(object):
                 self.start = header['buffer_start']
                 self.timestep = header['timestep']
                 self.duration = header['duration']
-                self.acceleration = numpy.zeros(shape=(3, len(data['acceleration'])), dtype=float)
+                self.data_length = len(data['acceleration'])
+                self.acceleration = numpy.zeros(shape=(3, self.data_length), dtype=float)
+                self.time = numpy.array(range(0, self.data_length)) * self.timestep
                 first_run = False
 
             # Sanity check: throw away components with repeated axes.
