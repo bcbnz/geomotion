@@ -108,7 +108,7 @@ def parse_component(source, timezone):
     header['magnitudes']['Mb'] = mb
     header['duration'] = d
     header['timestep'] = dt
-    header['site']['local_gravity'] = g
+    header['site']['local_gravity'] = g/1000
 
     # And finally we get to the data.
     all_data = []
