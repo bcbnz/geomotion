@@ -13,4 +13,4 @@
 # You should have received a copy of the GNU General Public License along with
 # geomotion.  If not, see <http://www.gnu.org/licenses/>.
 
-from sm.server import Server
+from sm.server import Server, NoSuchSite, NoSuchRecord

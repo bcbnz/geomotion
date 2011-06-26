@@ -86,14 +86,14 @@ class Server(object):
     Units
     -----
 
-    All returned values are in the units GeoNet uses. These are:
-        * distances - kilometres
+    All returned values are in the following units:
+        * distances - metres
         * angles/bearings - degrees
         * latitude and longitude - decimal degrees
         * times - seconds
-        * acceleration - millimetres per second per second
-        * velocity - millimetres per second
-        * displacement - millimetres
+        * acceleration - metres per second per second
+        * velocity - metres per second
+        * displacement - metres
 
     Attribution
     -----------

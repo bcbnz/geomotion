@@ -83,7 +83,7 @@ def parse_component(source, timezone):
     header['site']['longitudinal_axis'] = la
     header['axis'] = cd
     header['event']['bearing'] = b
-    header['event']['distance'] = dist
+    header['event']['distance'] = dist * 1000
 
     # And finally the number of samples.
     t, pre, app, a, v, d, x, x, bmin, bs = map(int, source.readline().split())
@@ -122,19 +122,19 @@ def parse_component(source, timezone):
     start = pre
     if a:
         end = start + a
-        data['acceleration'] = all_data[start:end]
+        data['acceleration'] = all_data[start:end] / 1000
         start = end
     else:
         data['acceleration'] = None
     if v:
         end = start + v
-        data['velocity'] = all_data[start:end]
+        data['velocity'] = all_data[start:end] / 1000
         start = end
     else:
         data['velocity'] = None
     if d:
         end = start + d
-        data['displacement'] = all_data[start:end]
+        data['displacement'] = all_data[start:end] / 1000
     else:
         data['displacement'] = None
 
