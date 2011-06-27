@@ -106,3 +106,12 @@ Updating the cache
 
     >>> import datetime
     >>> server.update_events(since=datetime.date(2011, 6, 1))
+
+Bugs
+====
+
+Not all data files seem to be parsed correctly due to inconsistencies in their
+formatting. If you come across any such records, please file a bug at
+https://github.com/blairbonnett/geomotion/issues stating the date and time of
+the event and the site(s) in question. Other bugs and feature requests can also
+be posted to the same address.
