@@ -113,7 +113,15 @@ def parse_component(source, timezone):
 
     # And finally we get to the data.
     all_data = []
-    while len(all_data) < t:
+
+    # Fun fact of the day: the number of digitised samples (the 't' variable
+    # which is the first value of the fourth line of integer headers) is NOT
+    # always the number of data points in the file. If it is larger than the
+    # real number of points, we will start to chew up the next component in the
+    # record (or hit EOF problems). If it is smaller, we will miss data and have
+    # issues finding the start of the next component. Hence we use the number of
+    # acceleration points in the file as our indicator.
+    while len(all_data) < a:
         all_data.extend(source.readline().split())
 
     # Convert it to a numpy array.
