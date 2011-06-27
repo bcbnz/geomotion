@@ -114,6 +114,15 @@ def parse_component(source, timezone):
     # And finally we get to the data.
     all_data = []
 
+    # The data is given in lines of 10 floating-point numbers, each represented
+    # as 8 ASCII characters. In general, there is a space between them so we
+    # could just use the .split() method to get the individual values. However,
+    # 999999.9 seems to be the GeoNet way of representing NaN, leading to no
+    # space. Some basic profiling indicated preparing some ranges ahead of time
+    # and using them as indices to get the data was the most efficient way of
+    # proceeding.
+    blocks = [slice(i*8, i*8+8) for i in range(0, 10)]
+
     # Fun fact of the day: the number of digitised samples (the 't' variable
     # which is the first value of the fourth line of integer headers) is NOT
     # always the number of data points in the file. If it is larger than the
@@ -122,7 +131,9 @@ def parse_component(source, timezone):
     # issues finding the start of the next component. Hence we use the number of
     # acceleration points in the file as our indicator.
     while len(all_data) < a:
-        all_data.extend(source.readline().split())
+        line = source.readline()
+        values = [line[block] for block in blocks]
+        all_data.extend([value for value in values if not value.isspace()])
 
     # Convert it to a numpy array.
     all_data = numpy.array(all_data, dtype=float)
