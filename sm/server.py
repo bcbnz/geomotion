@@ -418,7 +418,7 @@ class Server(object):
         :param year: The year in question.
         :type year: integer
         :param month: The month in question.
-        :type month: integer'
+        :type month: integer
 
         """
         cursor = self.info_cache.cursor()
@@ -426,6 +426,25 @@ class Server(object):
                        year=? and month=?;''', (year, month))
         events = [(row['id'], self._dbtolocal(year, month, row['day'], row['hour'],
                    row['minute'], row['second'])) for row in cursor]
+        cursor.close()
+        return sorted(events, key=itemgetter(1))
+
+    def events_at_site(self, site):
+        """Get a list of events for which a particular site has a record.  Each
+        event is returned as a two-element tuple, the first element of which is
+        the event ID and the second the date and time it occurred.
+
+        :param site: The GeoNet code for the site in question.
+        :type site: string
+
+        """
+        cursor = self.info_cache.cursor()
+        cursor.execute('''select id, year, month, day, hour, minute, second from
+                       events, records where events.id=records.event_id and
+                       records.site=?;''', (site,))
+        events = [(row['id'], self._dbtolocal(row['year'], row['month'],
+                   row['day'], row['hour'], row['minute'], row['second'])) for
+                   row in cursor]
         cursor.close()
         return sorted(events, key=itemgetter(1))
 
