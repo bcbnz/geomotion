@@ -230,7 +230,25 @@ class Record(object):
 
     """
 
-    def __init__(self, site_info, source, timezone):
+    class Alignment:
+        """Holds constants specifying how measured values in the file should be
+        remapped. The vertical axis (axis 3 in the returned record) will not be
+        remapped, while the horizontal accelerations (axes 0 and 1) will be
+        remapped according to the constant given when creating an instance of
+        the Record class.
+
+        """
+        #: Don't realign the measured values.
+        NONE = 0
+
+        #: Realign the values to north (axis 0) and east (axis 1).
+        NORTH_AND_EAST = 1
+
+        #: Realign the values to the bearing between the site and the epicentre
+        #: (axis 0) and 90 degrees clockwise from this (axis 1).
+        EPICENTRE = 2
+
+    def __init__(self, site_info, source, timezone, alignment=Alignment.NORTH_AND_EAST):
         """
 
         :param site_info: The site information dictionary as returned by
@@ -240,10 +258,16 @@ class Record(object):
                        a file object, or a filename.
         :param timezone: The timezone to convert all dates and times to.
         :type timezone: pytz.timezone
+        :param alignment: A constant from :class:`Record.Alignment` specifying
+                          what alignment the measured values should be remapped
+                          to.
         :raise TooFewComponents: If there are not enough components in the
                                  source to realign the measurements.
 
         """
+        # Store the chosen alignment mode.
+        self.alignment = alignment
+
         # Given a filename, open it.
         close = False
         if isinstance(source, basestring):
@@ -270,6 +294,15 @@ class Record(object):
                 self.data_length = len(data['acceleration'])
                 self.acceleration = numpy.zeros(shape=(3, self.data_length), dtype=float)
                 self.time = numpy.array(range(0, self.data_length)) * self.timestep
+
+                # If we will be realigning the horizontal axes, get the heading
+                # we want to align them to.
+                if self.alignment == Record.Alignment.NORTH_AND_EAST:
+                    alignment_heading = 0
+                elif self.alignment == Record.Alignment.EPICENTRE:
+                    alignment_heading = header['event']['bearing']
+
+                # Don't need to go through this process again.
                 first_run = False
 
             # Sanity check: throw away components with repeated axes.
@@ -282,12 +315,24 @@ class Record(object):
                 self.acceleration[2] = data['acceleration']
                 vertical_axis = True
 
-            # Only need two different horizontal axes to be able to realign to N
-            # and E components.
+            # Only need two different horizontal axes.
             elif horizontal_axes < 2:
-                angle = math.radians(header['axis'])
-                self.acceleration[0] += data['acceleration'] * math.cos(angle)
-                self.acceleration[1] += data['acceleration'] * math.sin(angle)
+                # Don't realign the values.
+                if self.alignment == Record.Alignment.NONE:
+                    self.acceleration[horizontal_axes] = data['acceleration']
+
+                # We want to realign them.
+                else:
+                    # The angle between the component heading and the alignment
+                    # heading.
+                    angle = math.radians(header['axis'] - alignment_heading)
+
+                    # Project the measured values onto the new axes and sum over
+                    # the different components.
+                    self.acceleration[0] += data['acceleration'] * math.cos(angle)
+                    self.acceleration[1] += data['acceleration'] * math.sin(angle)
+
+                # Done with this axis.
                 horizontal_axes += 1
 
             # Shortcut: once we have realigned the horizontal components and

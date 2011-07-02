@@ -14,4 +14,4 @@
 # geomotion.  If not, see <http://www.gnu.org/licenses/>.
 
 from sm.server import Server, NoSuchSite, NoSuchRecord
-from sm.record import TooFewComponents
+from sm.record import TooFewComponents, Record

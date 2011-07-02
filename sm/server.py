@@ -507,7 +507,7 @@ class Server(object):
         d['opened'] = date.astimezone(self.local_timezone)
         return d
 
-    def get_record(self, event, site, skip_cache=False):
+    def get_record(self, event, site, alignment=Record.Alignment.NORTH_AND_EAST, skip_cache=False):
         """Get the record of an event from a particular site. This is returned
         as a Record instance.
 
@@ -515,6 +515,9 @@ class Server(object):
         :type event: integer
         :param site: The GeoNet code for the site in question.
         :type site: string
+        :param alignment: A constant from :class:`Record.Alignment` specifying
+                          what alignment the measured values should be remapped
+                          to.
         :param skip_cache: Ignore cached data and force a download.
         :type skip_cache: Boolean
 
@@ -568,4 +571,5 @@ class Server(object):
             site_info = {}
 
         # Parse and return the data.
-        return Record(site_info, cache_filename, self.local_timezone)
+        return Record(site_info, cache_filename, self.local_timezone,
+                      alignment=alignment)
